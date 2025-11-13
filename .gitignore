@@ -91,3 +91,7 @@ af.cmd
 
 # playwright
 storageState.json
+
+# local development
+LOCAL_DEV_GUIDE.md
+.claude/
