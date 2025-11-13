@@ -436,6 +436,7 @@ __metadata:
     "@types/bytes": "npm:^3.1.5"
     "@types/image-blob-reduce": "npm:^4.1.4"
     "@types/lodash-es": "npm:^4.17.12"
+    "@types/plantuml-encoder": "npm:^1"
     "@types/semver": "npm:^7"
     "@vanilla-extract/css": "npm:^1.17.0"
     "@vanilla-extract/dynamic": "npm:^2.1.2"
@@ -471,6 +472,7 @@ __metadata:
     mp4-muxer: "npm:^5.2.1"
     nanoid: "npm:^5.0.9"
     next-themes: "npm:^0.4.4"
+    plantuml-encoder: "npm:^1.4.0"
     query-string: "npm:^9.1.1"
     react: "npm:19.1.0"
     react-dom: "npm:19.1.0"
@@ -15881,6 +15883,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/plantuml-encoder@npm:^1":
+  version: 1.4.2
+  resolution: "@types/plantuml-encoder@npm:1.4.2"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10/d849ef500314a2e2d649b06ff5da7c576c71b673dc94001699c3e7d38fb8b0a30327fad57d3d11be322737ce137adf9a61fa9ac8abc18f10820ea924c0cf0a0d
+  languageName: node
+  linkType: hard
+
 "@types/prompts@npm:^2.4.9":
   version: 2.4.9
   resolution: "@types/prompts@npm:2.4.9"
@@ -29754,6 +29765,13 @@ __metadata:
     exsolve: "npm:^1.0.7"
     pathe: "npm:^2.0.3"
   checksum: 10/4b36e4eb12693a1beb145573c564ec6fb74b1008d3b457eaa1f0072331edf05cb7c479c47fe0c4bfdec76c2caff5b68215ff270e5fe49634c07984a7a0197118
+  languageName: node
+  linkType: hard
+
+"plantuml-encoder@npm:^1.4.0":
+  version: 1.4.0
+  resolution: "plantuml-encoder@npm:1.4.0"
+  checksum: 10/cfe8831356bdd60ef80a748a04d3b0bfcbf827a499da6fb5ad853450e7a677129c1ec082cdfbc57817dee3e59c5f1f2d00d8082198173b34ced8196dcb34d8fe
   languageName: node
   linkType: hard
 
