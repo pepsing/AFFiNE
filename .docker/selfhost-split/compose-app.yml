@@ -1,0 +1,89 @@
+# AFFiNE Self-hosted Application
+# 应用独立部署配置 - 连接外部中间件
+
+name: affine-app
+
+services:
+  # Migration job - 在应用启动前运行数据库迁移
+  affine_migration:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_migration_job
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/storage}:/root/.affine/storage
+      - ${CONFIG_LOCATION:-./data/config}:/root/.affine/config
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    environment:
+      - REDIS_SERVER_HOST=${REDIS_SERVER_HOST}
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-6379}
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_DATABASE:-affine}
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      - MAILER_HOST=${MAILER_HOST:-}
+      - MAILER_PORT=${MAILER_PORT:-1025}
+    env_file:
+      - .env.app
+    restart: "no"
+    networks:
+      - affine-network
+
+  # AFFiNE 应用
+  affine:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_server
+    ports:
+      - '${PORT:-3010}:3010'
+    depends_on:
+      affine_migration:
+        condition: service_completed_successfully
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/storage}:/root/.affine/storage
+      - ${CONFIG_LOCATION:-./data/config}:/root/.affine/config
+    environment:
+      # 数据库配置
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_DATABASE:-affine}
+
+      # Redis 配置
+      - REDIS_SERVER_HOST=${REDIS_SERVER_HOST}
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-6379}
+
+      # 搜索引擎配置
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      - MANTICORE_HOST=${MANTICORE_HOST:-}
+      - MANTICORE_PORT=${MANTICORE_PORT:-9308}
+
+      # 邮件配置
+      - MAILER_HOST=${MAILER_HOST:-}
+      - MAILER_PORT=${MAILER_PORT:-1025}
+      - MAILER_SENDER=${MAILER_SENDER:-noreply@toeverything.info}
+      - MAILER_USER=${MAILER_USER:-}
+      - MAILER_PASSWORD=${MAILER_PASSWORD:-}
+      - MAILER_SECURE=${MAILER_SECURE:-false}
+
+      # 服务器配置
+      - AFFINE_SERVER_HOST=${AFFINE_SERVER_HOST:-}
+      - AFFINE_SERVER_PORT=${PORT:-3010}
+      - AFFINE_SERVER_HTTPS=${AFFINE_SERVER_HTTPS:-false}
+      - NODE_ENV=production
+
+      # 可选：AI/Copilot 配置
+      - COPILOT_FAL_API_KEY=${COPILOT_FAL_API_KEY:-}
+      - COPILOT_OPENAI_API_KEY=${COPILOT_OPENAI_API_KEY:-}
+      - COPILOT_PERPLEXITY_API_KEY=${COPILOT_PERPLEXITY_API_KEY:-}
+    env_file:
+      - .env.app
+    restart: unless-stopped
+    networks:
+      - affine-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3010/api/healthz']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  affine-network:
+    driver: bridge
+
+volumes:
+  storage_data:
+  config_data:

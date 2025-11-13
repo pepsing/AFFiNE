@@ -1,0 +1,101 @@
+# AFFiNE Self-hosted Middleware Stack
+# 中间件独立部署配置 - PostgreSQL, Redis 等
+# 可被外部应用和开发环境访问
+
+name: affine-middleware
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: affine_postgres
+    ports:
+      # 暴露端口供外部访问
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - ${DB_DATA_LOCATION:-./data/postgres}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-affine}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE:-affine}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', '${DB_USERNAME:-affine}', '-d', '${DB_DATABASE:-affine}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: affine_redis
+    ports:
+      # 暴露端口供外部访问
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - ${REDIS_DATA_LOCATION:-./data/redis}:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-}
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 可选：Mailpit 用于邮件测试
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: affine_mailpit
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1025}:1025'  # SMTP
+      - '${MAILPIT_WEB_PORT:-8025}:8025'   # Web UI
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    volumes:
+      - ${MAILPIT_DATA_LOCATION:-./data/mailpit}:/data
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 可选：Manticoresearch 用于全文搜索
+  manticoresearch:
+    image: manticoresearch/manticore:10.1.0
+    container_name: affine_manticore
+    ports:
+      - '${MANTICORE_PORT:-9308}:9308'
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ${MANTICORE_DATA_LOCATION:-./data/manticore}:/var/lib/manticore
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+networks:
+  affine-network:
+    driver: bridge
+    # 如果需要自定义网络配置
+    # ipam:
+    #   config:
+    #     - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+  redis_data:
+  mailpit_data:
+  manticore_data:

@@ -1,0 +1,20 @@
+# 忽略实际的生产配置文件
+.env
+.env.local
+.env.middleware.local
+.env.app.local
+
+# 忽略数据目录
+data/
+logs/
+
+# 忽略备份文件
+*.backup.*
+backup_*.sql
+*.tar.gz
+*.rdb
+
+# 忽略临时文件
+*.log
+*.pid
+*.sock
