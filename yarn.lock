@@ -952,6 +952,8 @@ __metadata:
     "@nestjs/throttler": "npm:^6.4.0"
     "@nestjs/websockets": "npm:^11.0.12"
     "@node-rs/argon2": "npm:^2.0.2"
+    "@node-rs/argon2-linux-arm64-gnu": "npm:^2.0.2"
+    "@node-rs/argon2-linux-x64-gnu": "npm:^2.0.2"
     "@node-rs/crc32": "npm:^1.10.6"
     "@opentelemetry/api": "npm:^1.9.0"
     "@opentelemetry/core": "npm:^1.30.1"
@@ -9598,9 +9600,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-arm64-gnu@npm:2.0.2":
+"@node-rs/argon2-linux-arm64-gnu@npm:2.0.2, @node-rs/argon2-linux-arm64-gnu@npm:^2.0.2":
   version: 2.0.2
   resolution: "@node-rs/argon2-linux-arm64-gnu@npm:2.0.2"
+  checksum: 10/ba193451757ed9346049e83f3eeca75c266a2a653c8a4e4d827dbf7c6c1a0178842937df5628ebddcc5c5f3860dcfcb094101a17ba356655bb3144f54a9845df
   conditions: os=linux & cpu=arm64 & libc=glibc
   languageName: node
   linkType: hard
@@ -9612,9 +9615,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-rs/argon2-linux-x64-gnu@npm:2.0.2":
+"@node-rs/argon2-linux-x64-gnu@npm:2.0.2, @node-rs/argon2-linux-x64-gnu@npm:^2.0.2":
   version: 2.0.2
   resolution: "@node-rs/argon2-linux-x64-gnu@npm:2.0.2"
+  checksum: 10/405d307cf7b3945aad5a9010bbfa100fd2d230aa3d0c96526fb12fc1eb0186895ece04a46a912076f73cfc864bf54d648d911a4798676c3c21024c4b4509e260
   conditions: os=linux & cpu=x64 & libc=glibc
   languageName: node
   linkType: hard

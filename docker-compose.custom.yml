@@ -1,0 +1,162 @@
+name: affine-custom
+services:
+  # 前端 Nginx 服务
+  affine-frontend:
+    image: affine-frontend:custom
+    container_name: affine_frontend
+    ports:
+      - '8080:8080'
+    depends_on:
+      affine-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 后端服务
+  affine-backend:
+    image: affine-backend:custom
+    container_name: affine_backend
+    ports:
+      - '3010:3010'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      affine-migration:
+        condition: service_completed_successfully
+    environment:
+      - NODE_ENV=production
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://affine:affine@postgres:5432/affine
+      - AFFINE_INDEXER_ENABLED=true
+      - MAILER_HOST=mailpit
+      - MAILER_PORT=1025
+      - MAILER_SENDER="noreply@affine.local"
+      - MAILER_USER="noreply@affine.local"
+      - MAILER_PASSWORD="affine"
+      - MAILER_SECURE=false
+      # 可选的 AI 配置（需要时取消注释并设置真实值）
+      # - COPILOT_FAL_API_KEY=your_fal_key
+      # - COPILOT_OPENAI_API_KEY=your_openai_key
+      # - COPILOT_PERPLEXITY_API_KEY=your_perplexity_key
+    volumes:
+      # 持久化存储
+      - affine_storage:/root/.affine/storage
+      - affine_config:/root/.affine/config
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3010/api/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 数据库迁移任务（仅 Schema 迁移，跳过数据迁移）
+  affine-migration:
+    image: affine-backend:custom
+    container_name: affine_migration
+    command:
+      [
+        'sh',
+        '-c',
+        'mkdir -p /root/.affine/config && yarn prisma migrate deploy',
+      ]
+    environment:
+      - NODE_ENV=production
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://affine:affine@postgres:5432/affine
+      - AFFINE_INDEXER_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - affine_storage:/root/.affine/storage
+      - affine_config:/root/.affine/config
+    networks:
+      - affine-network
+
+  # PostgreSQL 数据库
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: affine_postgres
+    environment:
+      POSTGRES_USER: affine
+      POSTGRES_PASSWORD: affine
+      POSTGRES_DB: affine
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'affine', '-d', 'affine']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: affine_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 邮件服务（开发/测试用）
+  mailpit:
+    image: axllent/mailpit
+    container_name: affine_mailpit
+    ports:
+      - '8025:8025' # Web UI
+      - '1025:1025' # SMTP
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+  # 全文搜索引擎
+  manticoresearch:
+    image: manticoresearch/manticore
+    container_name: affine_manticore
+    environment:
+      - EXTRA=1
+    volumes:
+      - manticore_data:/var/lib/manticore
+    restart: unless-stopped
+    networks:
+      - affine-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  manticore_data:
+  affine_storage:
+  affine_config:
+
+networks:
+  affine-network:
+    driver: bridge

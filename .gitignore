@@ -93,7 +93,9 @@ af.cmd
 
 # playwright
 storageState.json
-
 # local development
 LOCAL_DEV_GUIDE.md
 .claude/
+
+# build artifacts
+packages/backend/native/package-lock.json
