@@ -33,7 +33,7 @@ command -v node >/dev/null 2>&1 || { print_error "需要安装 Node.js"; exit 1;
 # 第一步：清理环境
 print_step "清理已有环境..."
 docker compose -f docker-compose.custom.yml down -v 2>/dev/null || true
-docker rmi affine-frontend:custom affine-backend:custom 2>/dev/null || true
+docker rmi affine-backend:custom 2>/dev/null || true
 
 print_step "清理 node_modules 和构建缓存..."
 rm -rf node_modules packages/*/node_modules packages/*/*/node_modules 2>/dev/null || true
@@ -53,25 +53,32 @@ fi
 print_step "安装项目依赖..."
 yarn install
 
-# 第四步：下载 ARM64 Linux native modules
+# 第四步：下载 ARM64 Linux native modules（从 npm registry）
 print_step "下载 ARM64 Linux native modules..."
 
-# 创建目录并下载 argon2
+# 创建目录并下载 argon2 (Linux ARM64)
 mkdir -p node_modules/@node-rs/argon2
 cd node_modules/@node-rs/argon2
 if [ ! -f argon2.linux-arm64-gnu.node ]; then
-    print_step "下载 argon2.linux-arm64-gnu.node..."
-    curl -L https://github.com/napi-rs/node-rs/releases/download/argon2@1.8.4/argon2.linux-arm64-gnu.node -o argon2.linux-arm64-gnu.node
+    print_step "下载 argon2.linux-arm64-gnu.node (Linux ARM64)..."
+    TMP_DIR=$(mktemp -d)
+    curl -sSL "https://registry.npmjs.org/@node-rs/argon2-linux-arm64-gnu/-/argon2-linux-arm64-gnu-2.0.2.tgz" | tar -xz -C "$TMP_DIR"
+    cp "$TMP_DIR/package/argon2.linux-arm64-gnu.node" ./argon2.linux-arm64-gnu.node
+    rm -rf "$TMP_DIR"
     echo "✅ argon2 模块下载完成"
 else
     echo "✅ argon2 模块已存在"
 fi
 
-# 创建目录并下载 crc32
+# 创建目录并下载 crc32 (Linux ARM64)
+mkdir -p ../crc32
 cd ../crc32
 if [ ! -f crc32.linux-arm64-gnu.node ]; then
-    print_step "下载 crc32.linux-arm64-gnu.node..."
-    curl -L https://github.com/napi-rs/node-rs/releases/download/crc32@1.10.2/crc32.linux-arm64-gnu.node -o crc32.linux-arm64-gnu.node
+    print_step "下载 crc32.linux-arm64-gnu.node (Linux ARM64)..."
+    TMP_DIR=$(mktemp -d)
+    curl -sSL "https://registry.npmjs.org/@node-rs/crc32-linux-arm64-gnu/-/crc32-linux-arm64-gnu-1.10.6.tgz" | tar -xz -C "$TMP_DIR"
+    cp "$TMP_DIR/package/crc32.linux-arm64-gnu.node" ./crc32.linux-arm64-gnu.node
+    rm -rf "$TMP_DIR"
     echo "✅ crc32 模块下载完成"
 else
     echo "✅ crc32 模块已存在"
@@ -79,12 +86,13 @@ fi
 
 cd ../../..
 
-# 第五步：构建前端
-print_step "构建前端..."
+# 第五步：构建前端（使用本地静态资源路径，静态文件由后端容器提供）
+print_step "构建前端应用（web / admin / mobile）..."
+export PUBLIC_PATH="/"
 yarn build --package @affine/web
-print_step "构建前端 Docker 镜像..."
-docker build -f .docker/web/Dockerfile -t affine-frontend:custom .
-echo "✅ 前端镜像构建完成"
+yarn build --package @affine/admin
+yarn build --package @affine/mobile
+echo "✅ 前端构建完成（静态资源已输出到 packages/frontend/apps/*/dist，将在后端镜像中作为 /static 提供）"
 
 # 第六步：在 Linux 容器内编译 Rust native module
 print_step "在 Linux 容器内编译 server-native..."
@@ -117,7 +125,7 @@ fi
 print_step "构建后端..."
 yarn build --package @affine/server
 print_step "构建后端 Docker 镜像..."
-docker build -f .docker/server/Dockerfile -t affine-backend:custom .
+docker build -f Dockerfile.backend.custom -t affine-backend:custom .
 echo "✅ 后端镜像构建完成"
 
 # 第八步：验证镜像
@@ -137,25 +145,18 @@ print_step "验证服务状态..."
 echo ""
 echo "🔍 服务状态检查:"
 
-# 检查前端
-if curl -s -f http://localhost:8080 > /dev/null; then
-    echo "✅ 前端服务: http://localhost:8080 - 正常"
+# 检查应用（前端 + 后端）
+if curl -s -f http://localhost:3010 > /dev/null; then
+    echo "✅ 应用入口: http://localhost:3010 - 正常"
 else
-    echo "❌ 前端服务: http://localhost:8080 - 异常"
+    echo "❌ 应用入口: http://localhost:3010 - 异常"
 fi
 
-# 检查后端
-if curl -s -f http://localhost:3010/admin/setup > /dev/null; then
-    echo "✅ 后端服务: http://localhost:3010 - 正常"
+# 检查健康检查接口
+if curl -s -f http://localhost:3010/api/healthz > /dev/null; then
+    echo "✅ 健康检查: http://localhost:3010/api/healthz - 正常（200 或 302）"
 else
-    echo "❌ 后端服务: http://localhost:3010 - 异常"
-fi
-
-# 检查邮件服务
-if curl -s -f http://localhost:8025 > /dev/null; then
-    echo "✅ 邮件服务: http://localhost:8025 - 正常"
-else
-    echo "❌ 邮件服务: http://localhost:8025 - 异常"
+    echo "❌ 健康检查: http://localhost:3010/api/healthz - 异常"
 fi
 
 echo ""
@@ -166,9 +167,9 @@ echo ""
 echo "🎉 AFFiNE ARM64 Docker 环境构建完成!"
 echo ""
 echo "📋 访问信息:"
-echo "  - 前端应用: http://localhost:8080"
-echo "  - 后端 API: http://localhost:3010"
-echo "  - 邮件管理: http://localhost:8025"
+echo "  - 应用入口（前端 + 后端）: http://localhost:3010"
+echo "  - 管理后台: http://localhost:3010/admin"
+echo "  - 健康检查: http://localhost:3010/api/healthz"
 echo ""
 echo "📝 管理命令:"
 echo "  - 停止服务: docker compose -f docker-compose.custom.yml stop"

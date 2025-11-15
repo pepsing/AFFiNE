@@ -1,0 +1,16 @@
+{
+  "$schema": "https://github.com/toeverything/affine/releases/latest/download/config.schema.json",
+  "auth": {
+    "allowSignup": true,
+    "allowSignupForOauth": false,
+    "requireEmailDomainVerification": false,
+    "requireEmailVerification": false
+  },
+  "mailer": {
+    "SMTP.host": "",
+    "SMTP.port": 465,
+    "SMTP.username": "",
+    "SMTP.password": ""
+  }
+}
+

@@ -35,10 +35,8 @@ services:
       - '${REDIS_PORT:-6379}:6379'
     volumes:
       - ${REDIS_DATA_LOCATION:-./data/redis}:/data
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD:-}
+    # 开发/调试环境默认不启用密码，方便直连
+    command: redis-server --appendonly yes
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -48,7 +46,7 @@ services:
     networks:
       - affine-network
 
-  # 可选：Mailpit 用于邮件测试
+  # 可选：Mailpit 用于邮件测试（模拟真实 SMTP 环境）
   mailpit:
     image: axllent/mailpit:latest
     container_name: affine_mailpit

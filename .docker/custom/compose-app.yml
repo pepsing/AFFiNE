@@ -1,0 +1,94 @@
+# AFFiNE 自建应用栈（自定义镜像）
+# 仅包含应用本身，可连接本地或生产中间件
+
+name: affine-app-custom
+
+services:
+  # 迁移任务：在应用启动前运行数据库迁移和初始化（features、quota 等）
+  affine_migration:
+    image: affine-backend:custom
+    container_name: affine_migration_custom
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/storage}:/root/.affine/storage
+      - ${CONFIG_LOCATION:-./data/config}:/root/.affine/config
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    environment:
+      # 数据库配置
+      - DATABASE_URL=postgresql://${DB_USERNAME:-affine}:${DB_PASSWORD:-affine}@${DB_HOST:-host.docker.internal}:${DB_PORT:-5432}/${DB_DATABASE:-affine}
+
+      # Redis 配置
+      - REDIS_SERVER_HOST=${REDIS_SERVER_HOST:-host.docker.internal}
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-6379}
+
+      # 搜索引擎配置
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      - MANTICORE_HOST=${MANTICORE_HOST:-host.docker.internal}
+      - MANTICORE_PORT=${MANTICORE_PORT:-9308}
+
+      # 邮件配置（可留空以禁用）
+      - MAILER_HOST=${MAILER_HOST:-}
+      - MAILER_PORT=${MAILER_PORT:-1025}
+    env_file:
+      - .env.app
+    restart: "no"
+    networks:
+      - affine-network
+
+  # AFFiNE 应用（前端 + 后端）
+  affine:
+    image: affine-backend:custom
+    container_name: affine_server_custom
+    ports:
+      - '${PORT:-3010}:3010'
+    depends_on:
+      affine_migration:
+        condition: service_completed_successfully
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/storage}:/root/.affine/storage
+      - ${CONFIG_LOCATION:-./data/config}:/root/.affine/config
+    environment:
+      # 数据库配置
+      - DATABASE_URL=postgresql://${DB_USERNAME:-affine}:${DB_PASSWORD:-affine}@${DB_HOST:-host.docker.internal}:${DB_PORT:-5432}/${DB_DATABASE:-affine}
+
+      # Redis 配置
+      - REDIS_SERVER_HOST=${REDIS_SERVER_HOST:-host.docker.internal}
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-6379}
+
+      # 搜索引擎配置
+      - AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
+      - MANTICORE_HOST=${MANTICORE_HOST:-host.docker.internal}
+      - MANTICORE_PORT=${MANTICORE_PORT:-9308}
+
+      # 邮件配置（可留空以禁用）
+      - MAILER_HOST=${MAILER_HOST:-}
+      - MAILER_PORT=${MAILER_PORT:-1025}
+      - MAILER_SENDER=${MAILER_SENDER:-noreply@affine.local}
+      - MAILER_USER=${MAILER_USER:-}
+      - MAILER_PASSWORD=${MAILER_PASSWORD:-}
+      - MAILER_SECURE=${MAILER_SECURE:-false}
+
+      # 服务器配置
+      - AFFINE_SERVER_HOST=${AFFINE_SERVER_HOST:-}
+      - AFFINE_SERVER_PORT=${PORT:-3010}
+      - AFFINE_SERVER_HTTPS=${AFFINE_SERVER_HTTPS:-false}
+      - NODE_ENV=production
+    env_file:
+      - .env.app
+    restart: unless-stopped
+    networks:
+      - affine-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3010/api/healthz']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  affine-network:
+    driver: bridge
+
+volumes:
+  storage_data:
+  config_data:
+

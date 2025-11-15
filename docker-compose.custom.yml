@@ -1,19 +1,6 @@
 name: affine-custom
 services:
-  # 前端 Nginx 服务
-  affine-frontend:
-    image: affine-frontend:custom
-    container_name: affine_frontend
-    ports:
-      - '8080:8080'
-    depends_on:
-      affine-backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - affine-network
-
-  # 后端服务
+  # 应用服务（同时提供前端页面和后端 API）
   affine-backend:
     image: affine-backend:custom
     container_name: affine_backend
@@ -24,19 +11,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      affine-migration:
-        condition: service_completed_successfully
     environment:
       - NODE_ENV=production
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://affine:affine@postgres:5432/affine
       - AFFINE_INDEXER_ENABLED=true
-      - MAILER_HOST=mailpit
-      - MAILER_PORT=1025
-      - MAILER_SENDER="noreply@affine.local"
-      - MAILER_USER="noreply@affine.local"
-      - MAILER_PASSWORD="affine"
-      - MAILER_SECURE=false
       # 可选的 AI 配置（需要时取消注释并设置真实值）
       # - COPILOT_FAL_API_KEY=your_fal_key
       # - COPILOT_OPENAI_API_KEY=your_openai_key
@@ -45,13 +24,15 @@ services:
       # 持久化存储
       - affine_storage:/root/.affine/storage
       - affine_config:/root/.affine/config
+      # 自定义应用配置（关闭邮箱验证和 OAuth 注册）
+      - ./.docker/custom/config.json:/root/.affine/config/config.json:ro
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "require('http').get('http://localhost:3010/api/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+          "require('http').get('http://localhost:3010/api/healthz', (res) => { process.exit(res.statusCode === 200 || res.statusCode === 302 ? 0 : 1) })",
         ]
       interval: 30s
       timeout: 10s
@@ -69,7 +50,7 @@ services:
       [
         'sh',
         '-c',
-        'mkdir -p /root/.affine/config && yarn prisma migrate deploy',
+        'mkdir -p /root/.affine/config && node ./scripts/self-host-predeploy.js',
       ]
     environment:
       - NODE_ENV=production
@@ -125,19 +106,6 @@ services:
       - affine-network
 
   # 邮件服务（开发/测试用）
-  mailpit:
-    image: axllent/mailpit
-    container_name: affine_mailpit
-    ports:
-      - '8025:8025' # Web UI
-      - '1025:1025' # SMTP
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
-    restart: unless-stopped
-    networks:
-      - affine-network
-
   # 全文搜索引擎
   manticoresearch:
     image: manticoresearch/manticore
