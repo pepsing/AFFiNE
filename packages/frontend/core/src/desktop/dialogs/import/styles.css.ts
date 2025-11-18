@@ -108,3 +108,72 @@ export const importItemPrefix = style({
 export const importItemSuffix = style({
   marginLeft: 'auto',
 });
+
+export const folderSelector = style({
+  width: '100%',
+  borderRadius: '12px',
+  border: `1px solid ${cssVarV2('layer/insideBorder/border')}`,
+  padding: '12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  background: cssVarV2('layer/background/hoverOverlay'),
+});
+
+export const folderSelectorHeader = style({
+  display: 'flex',
+  width: '100%',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  flexWrap: 'wrap',
+});
+
+export const folderSelectorTitle = style({
+  fontSize: cssVar('fontBase'),
+  fontWeight: 600,
+  color: cssVar('textPrimaryColor'),
+});
+
+export const folderSelectorActions = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+});
+
+export const folderSelectorList = style({
+  width: '100%',
+  maxHeight: '180px',
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+});
+
+export const folderSelectorItem = style({
+  width: '100%',
+  border: 'none',
+  background: 'transparent',
+  color: cssVar('textPrimaryColor'),
+  padding: '6px 8px',
+  borderRadius: '6px',
+  textAlign: 'left',
+  fontSize: cssVar('fontSm'),
+  cursor: 'pointer',
+  transition: 'background 0.2s ease',
+  selectors: {
+    '&:hover': {
+      background: cssVarV2('layer/background/secondary'),
+    },
+  },
+});
+
+export const folderSelectorItemSelected = style({
+  background: cssVarV2('layer/background/secondary'),
+  color: cssVar('textEmphasisColor'),
+});
+
+export const folderSelectorEmpty = style({
+  fontSize: cssVar('fontSm'),
+  color: cssVar('textSecondaryColor'),
+});

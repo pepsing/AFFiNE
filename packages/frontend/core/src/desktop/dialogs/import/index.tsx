@@ -9,7 +9,10 @@ import {
   type WORKSPACE_DIALOG_SCHEMA,
 } from '@affine/core/modules/dialogs';
 import { ExplorerIconService } from '@affine/core/modules/explorer-icon/services/explorer-icon';
-import { OrganizeService } from '@affine/core/modules/organize';
+import {
+  type FolderNode,
+  OrganizeService,
+} from '@affine/core/modules/organize';
 import { UrlService } from '@affine/core/modules/url';
 import {
   getAFFiNEWorkspaceSchema,
@@ -38,9 +41,10 @@ import {
   SaveIcon,
   ZipIcon,
 } from '@blocksuite/icons/rc';
-import { useService } from '@toeverything/infra';
+import { useLiveData, useService } from '@toeverything/infra';
 import { cssVar } from '@toeverything/theme';
 import { cssVarV2 } from '@toeverything/theme/v2';
+import clsx from 'clsx';
 import {
   type ReactElement,
   type SVGAttributes,
@@ -542,10 +546,143 @@ const ImportOptionItem = ({
   );
 };
 
+const FolderSelector = ({
+  selectedFolderId,
+  onSelectFolder,
+  organizeService,
+}: {
+  selectedFolderId: string | null;
+  onSelectFolder: (folderId: string | null) => void;
+  organizeService: OrganizeService;
+}) => {
+  const t = useI18n();
+  const rootFolder = organizeService.folderTree.rootFolder;
+  const folders = useLiveData(rootFolder.sortedChildren$);
+  const untitledLabel = t['Untitled']();
+
+  const handleClear = useCallback(() => {
+    onSelectFolder(null);
+  }, [onSelectFolder]);
+
+  const handleCreateFolder = useCallback(() => {
+    const newFolderId = rootFolder.createFolder(
+      t['com.affine.rootAppSidebar.organize.new-folders'](),
+      rootFolder.indexAt('before')
+    );
+    onSelectFolder(newFolderId);
+  }, [onSelectFolder, rootFolder, t]);
+
+  const handleSelectFolder = useCallback(
+    (folderId: string) => {
+      onSelectFolder(folderId);
+    },
+    [onSelectFolder]
+  );
+
+  return (
+    <div className={style.folderSelector}>
+      <div className={style.folderSelectorHeader}>
+        <span className={style.folderSelectorTitle}>
+          {t['Select']()} {t['com.affine.m.selector.where-folder']()}
+        </span>
+        <div className={style.folderSelectorActions}>
+          <Button
+            size="small"
+            variant="plain"
+            onClick={handleClear}
+            disabled={!selectedFolderId}
+          >
+            {t['All pages']()}
+          </Button>
+          <Button size="small" variant="plain" onClick={handleCreateFolder}>
+            {t['com.affine.rootAppSidebar.organize.new-folders']()}
+          </Button>
+        </div>
+      </div>
+      <div className={style.folderSelectorList}>
+        {folders.length ? (
+          folders.map((child, index) => (
+            <FolderSelectorNode
+              key={child.id ?? `folder-${index}`}
+              node={child}
+              level={0}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={handleSelectFolder}
+              untitledLabel={untitledLabel}
+            />
+          ))
+        ) : (
+          <div className={style.folderSelectorEmpty}>
+            {t['com.affine.rootAppSidebar.organize.empty']()}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const FolderSelectorNode = ({
+  node,
+  level,
+  selectedFolderId,
+  onSelectFolder,
+  untitledLabel,
+}: {
+  node: FolderNode;
+  level: number;
+  selectedFolderId: string | null;
+  onSelectFolder: (folderId: string) => void;
+  untitledLabel: string;
+}) => {
+  const type = useLiveData(node.type$);
+  const name = useLiveData(node.name$);
+  const children = useLiveData(node.sortedChildren$);
+
+  if (type !== 'folder' || !node.id) {
+    return null;
+  }
+
+  const isSelected = node.id === selectedFolderId;
+
+  return (
+    <>
+      <button
+        type="button"
+        className={clsx(
+          style.folderSelectorItem,
+          isSelected && style.folderSelectorItemSelected
+        )}
+        style={{ paddingLeft: `${level * 16}px` }}
+        onClick={() => onSelectFolder(node.id as string)}
+      >
+        {name || untitledLabel}
+      </button>
+      {children.map(child =>
+        child ? (
+          <FolderSelectorNode
+            key={child.id ?? `${node.id}-child-${level}`}
+            node={child}
+            level={level + 1}
+            selectedFolderId={selectedFolderId}
+            onSelectFolder={onSelectFolder}
+            untitledLabel={untitledLabel}
+          />
+        ) : null
+      )}
+    </>
+  );
+};
+
 const ImportOptions = ({
   onImport,
+  selectedFolderId,
+  onSelectFolder,
+  organizeService,
 }: {
   onImport: (type: ImportType) => void;
+  selectedFolderId: string | null;
+  onSelectFolder: (folderId: string | null) => void;
+  organizeService: OrganizeService;
 }) => {
   const t = useI18n();
 
@@ -553,6 +690,11 @@ const ImportOptions = ({
     <>
       <div className={style.importModalTitle}>{t['Import']()}</div>
       <div className={style.importModalContent}>
+        <FolderSelector
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={onSelectFolder}
+          organizeService={organizeService}
+        />
         {importOptions.map(
           ({
             key,
@@ -675,6 +817,9 @@ export const ImportDialog = ({
   const [status, setStatus] = useState<Status>('idle');
   const [importError, setImportError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [destinationFolderId, setDestinationFolderId] = useState<string | null>(
+    null
+  );
   const workspace = useService(WorkspaceService).workspace;
   const docCollection = workspace.docCollection;
   const organizeService = useService(OrganizeService);
@@ -726,6 +871,34 @@ export const ImportDialog = ({
     };
   }, [globalDialogService, handleCreatedWorkspace]);
 
+  const applyFolderSelection = useCallback(
+    (docIds: string[], rootFolderId?: string) => {
+      if (!destinationFolderId) {
+        return;
+      }
+      const folderNode$ =
+        organizeService.folderTree.folderNode$(destinationFolderId);
+      const folder = folderNode$.value;
+      if (!folder) {
+        return;
+      }
+
+      if (rootFolderId) {
+        if (rootFolderId === destinationFolderId) {
+          return;
+        }
+        folder.moveHere(rootFolderId, folder.indexAt('after'));
+        return;
+      }
+
+      docIds.forEach(docId => {
+        const index = folder.indexAt('after');
+        folder.createLink('doc', docId, index);
+      });
+    },
+    [destinationFolderId, organizeService]
+  );
+
   const handleImport = useAsyncCallback(
     async (type: ImportType) => {
       setImportError(null);
@@ -761,6 +934,8 @@ export const ImportDialog = ({
             explorerIconService
           );
 
+        applyFolderSelection(docIds, rootFolderId);
+
         setImportResult({ docIds, entryId, isWorkspaceFile, rootFolderId });
         setStatus('success');
         track.$.importModal.$.import({
@@ -787,6 +962,7 @@ export const ImportDialog = ({
       }
     },
     [
+      applyFolderSelection,
       docCollection,
       explorerIconService,
       handleImportAffineFile,
@@ -796,15 +972,23 @@ export const ImportDialog = ({
   );
 
   const handleComplete = useCallback(() => {
+    setDestinationFolderId(null);
     close(importResult || undefined);
-  }, [importResult, close]);
+  }, [close, importResult]);
 
   const handleRetry = () => {
     setStatus('idle');
   };
 
   const statusComponents = {
-    idle: <ImportOptions onImport={handleImport} />,
+    idle: (
+      <ImportOptions
+        onImport={handleImport}
+        selectedFolderId={destinationFolderId}
+        onSelectFolder={setDestinationFolderId}
+        organizeService={organizeService}
+      />
+    ),
     importing: <ImportingStatus />,
     success: <SuccessStatus onComplete={handleComplete} />,
     error: <ErrorStatus error={importError} onRetry={handleRetry} />,
@@ -815,6 +999,7 @@ export const ImportDialog = ({
       open
       onOpenChange={(open: boolean) => {
         if (!open) {
+          setDestinationFolderId(null);
           close(importResult || undefined);
         }
       }}
