@@ -13,6 +13,10 @@ import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-ap
 import { useEnableAI } from '@affine/core/components/hooks/affine/use-enable-ai';
 import { useRegisterBlocksuiteEditorCommands } from '@affine/core/components/hooks/affine/use-register-blocksuite-editor-commands';
 import { useActiveBlocksuiteEditor } from '@affine/core/components/hooks/use-block-suite-editor';
+import {
+  RouteLogic,
+  useNavigateHelper,
+} from '@affine/core/components/hooks/use-navigate-helper';
 import { PageDetailEditor } from '@affine/core/components/page-detail-editor';
 import { WorkspacePropertySidebar } from '@affine/core/components/properties/sidebar';
 import { TrashPageFooter } from '@affine/core/components/pure/trash-page-footer';
@@ -91,6 +95,7 @@ const DetailPageImpl = memo(function DetailPageImpl() {
   const workspace = workspaceService.workspace;
   const globalContext = globalContextService.globalContext;
   const doc = docService.doc;
+  const { jumpToPage } = useNavigateHelper();
 
   const mode = useLiveData(editor.mode$);
   const activeSidebarTab = useLiveData(view.activeSidebarTab$);
@@ -171,6 +176,8 @@ const DetailPageImpl = memo(function DetailPageImpl() {
     return;
   }, [doc, globalContext, isActiveView, mode]);
 
+  const prevTrashRef = useRef<boolean>(!!isInTrash);
+
   useEffect(() => {
     if (isActiveView) {
       globalContext.isTrashDoc.set(!!isInTrash);
@@ -181,6 +188,14 @@ const DetailPageImpl = memo(function DetailPageImpl() {
     }
     return;
   }, [globalContext, isActiveView, isInTrash]);
+
+  useEffect(() => {
+    const prev = prevTrashRef.current;
+    prevTrashRef.current = !!isInTrash;
+    if (isActiveView && prev === false && isInTrash) {
+      jumpToPage(workspace.id, 'all', RouteLogic.REPLACE);
+    }
+  }, [isActiveView, isInTrash, jumpToPage, workspace.id]);
 
   useRegisterBlocksuiteEditorCommands(editor, isActiveView);
 

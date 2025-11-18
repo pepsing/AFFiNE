@@ -50,6 +50,87 @@ type ImportMarkdownZipOptions = {
   extensions: ExtensionType[];
 };
 
+function normalizeTitle(title?: string) {
+  return (title ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function stripLeadingTitle(markdown: string, title?: string) {
+  if (!title) return markdown;
+  const normalizedTitle = normalizeTitle(title);
+  if (!normalizedTitle) return markdown;
+
+  const lines = markdown.split(/\r?\n/);
+  if (!lines.length) return markdown;
+
+  const removeLines = (count: number) => {
+    lines.splice(0, count);
+    while (lines[0] === '') {
+      lines.shift();
+    }
+  };
+
+  const firstLine = lines[0];
+  const matchHeading = firstLine.match(/^#{1,6}\s+(.*)$/);
+  if (matchHeading) {
+    const headingText = normalizeTitle(matchHeading[1]);
+    if (headingText === normalizedTitle) {
+      removeLines(1);
+      return lines.join('\n');
+    }
+    return markdown;
+  }
+
+  // Setext-style heading (Title on first line, ===== on next)
+  if (lines.length > 1 && /^=+\s*$/.test(lines[1])) {
+    const headingText = normalizeTitle(firstLine);
+    if (headingText === normalizedTitle) {
+      removeLines(2);
+      return lines.join('\n');
+    }
+  }
+
+  return markdown;
+}
+
+function isLocalAssetLink(link?: string) {
+  if (!link) {
+    return false;
+  }
+  const normalized = link.trim().toLowerCase();
+  return (
+    normalized.startsWith('assets/') ||
+    normalized.startsWith('https://assets/') ||
+    normalized.startsWith('http://assets/')
+  );
+}
+
+function removeAttachmentLinkParagraphs(doc: Store) {
+  const paragraphs = doc.getBlocksByFlavour('affine:paragraph');
+  for (const paragraph of paragraphs) {
+    const text = paragraph.model.text;
+    const delta = text?.toDelta();
+    if (!Array.isArray(delta) || delta.length === 0) continue;
+    let hasAttachmentLink = false;
+    const onlyAttachmentContent = delta.every(op => {
+      if (typeof op.insert !== 'string') return false;
+      const trimmed = op.insert.trim();
+      const link = op.attributes?.link as string | undefined;
+      if (link && isLocalAssetLink(link)) {
+        hasAttachmentLink = true;
+        return true;
+      }
+      return trimmed.length === 0;
+    });
+    if (hasAttachmentLink && onlyAttachmentContent) {
+      doc.deleteBlock(paragraph.model);
+    }
+  }
+}
+
 /**
  * Exports a doc to a Markdown file or a zip archive containing Markdown and assets.
  * @param doc The doc to export
@@ -154,6 +235,8 @@ async function importMarkdownToDoc({
   extensions,
 }: ImportMarkdownToDocOptions) {
   const provider = getProvider(extensions);
+  const normalizedTitle = (fileName ?? '').trim();
+  const sanitizedMarkdown = stripLeadingTitle(markdown, normalizedTitle);
   const job = new Transformer({
     schema,
     blobCRUD: collection.blobSync,
@@ -170,12 +253,13 @@ async function importMarkdownToDoc({
   });
   const mdAdapter = new MarkdownAdapter(job, provider);
   const page = await mdAdapter.toDoc({
-    file: markdown,
+    file: sanitizedMarkdown,
     assets: job.assetsManager,
   });
   if (!page) {
     return;
   }
+  removeAttachmentLinkParagraphs(page);
   return page.id;
 }
 
@@ -263,11 +347,13 @@ async function importMarkdownZip({
 
       const mdAdapter = new MarkdownAdapter(job, provider);
       const markdown = await contentBlob.text();
+      const sanitizedMarkdown = stripLeadingTitle(markdown, fileNameWithoutExt);
       const doc = await mdAdapter.toDoc({
-        file: markdown,
+        file: sanitizedMarkdown,
         assets: job.assetsManager,
       });
       if (doc) {
+        removeAttachmentLinkParagraphs(doc);
         docIds.push(doc.id);
       }
     })
