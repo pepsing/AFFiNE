@@ -1,7 +1,8 @@
 # Application Configuration
 # 应用配置文件 - 用于独立部署应用
 
-# AFFiNE Version
+# AFFiNE Version / Image
+AFFINE_IMAGE=localhost/affine-backend:custom
 AFFINE_REVISION=stable
 
 # Application Port
