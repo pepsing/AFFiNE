@@ -6,7 +6,7 @@ name: affine-app
 services:
   # Migration job - 在应用启动前运行数据库迁移
   affine_migration:
-    image: ${AFFINE_IMAGE:-ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}}
+    image: "${AFFINE_IMAGE:-ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}}"
     container_name: affine_migration_job
     volumes:
       - ${UPLOAD_LOCATION:-./data/storage}:/root/.affine/storage
@@ -27,7 +27,7 @@ services:
 
   # AFFiNE 应用
   affine:
-    image: ${AFFINE_IMAGE:-ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}}
+    image: "${AFFINE_IMAGE:-ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}}"
     container_name: affine_server
     ports:
       - '${PORT:-3010}:3010'
