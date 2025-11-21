@@ -1,13 +1,27 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-/** @type {import('.')} */
-const loadNative = filename => {
-  const target = path.join(__dirname, filename);
+const getRequire = () =>
+  typeof __non_webpack_require__ === 'function'
+    ? __non_webpack_require__
+    : require;
+
+const resolveNativePath = filename => {
+  const req = getRequire();
+  const pkgRoot = path.dirname(
+    req.resolve('@affine/server-native/package.json')
+  );
+  const target = path.join(pkgRoot, filename);
   if (!fs.existsSync(target)) {
     throw new Error(`Native binary missing: ${filename}`);
   }
-  return require(target);
+  return { req, target };
+};
+
+/** @type {import('.')} */
+const loadNative = filename => {
+  const { req, target } = resolveNativePath(filename);
+  return req(target);
 };
 
 const binding = (() => {
