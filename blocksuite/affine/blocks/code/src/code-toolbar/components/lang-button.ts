@@ -111,15 +111,46 @@ export class LanguageListButton extends WithDisposable(
   override connectedCallback(): void {
     super.connectedCallback();
 
-    const langList = localStorage.getItem('blocksuite:code-block:lang-list');
-    if (langList) {
-      this._sortedBundledLanguages = JSON.parse(langList);
-    } else {
-      this._sortedBundledLanguages = this.blockComponent.langs.map(lang => ({
+    const baseLangs: FilterableListItem[] = this.blockComponent.langs.map(
+      lang => ({
         label: lang.name,
         name: lang.id,
         aliases: lang.aliases,
-      }));
+      })
+    );
+
+    const langList = localStorage.getItem('blocksuite:code-block:lang-list');
+    if (langList) {
+      try {
+        const stored: FilterableListItem[] = JSON.parse(langList);
+        const merged: FilterableListItem[] = [];
+        const seen = new Set<string>();
+
+        // Keep stored order for languages that still exist
+        for (const item of stored) {
+          const fromBase = baseLangs.find(
+            base => base.name === item.name || base.label === item.label
+          );
+          if (fromBase && !seen.has(fromBase.name)) {
+            merged.push(fromBase);
+            seen.add(fromBase.name);
+          }
+        }
+
+        // Append any new languages (e.g. PlantUML) that were not in stored list
+        for (const base of baseLangs) {
+          if (!seen.has(base.name)) {
+            merged.push(base);
+            seen.add(base.name);
+          }
+        }
+
+        this._sortedBundledLanguages = merged;
+      } catch {
+        this._sortedBundledLanguages = baseLangs;
+      }
+    } else {
+      this._sortedBundledLanguages = baseLangs;
     }
 
     this.disposables.add(() => {

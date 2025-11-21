@@ -8,9 +8,7 @@ const getRequire = () =>
 
 const resolveNativePath = filename => {
   const req = getRequire();
-  const pkgRoot = path.dirname(
-    req.resolve('@affine/server-native/package.json')
-  );
+  const pkgRoot = path.dirname(req.resolve('@affine/server-native'));
   const target = path.join(pkgRoot, filename);
   if (!fs.existsSync(target)) {
     throw new Error(`Native binary missing: ${filename}`);
